@@ -10,7 +10,7 @@ import { StackHandler, StackProvider, StackTheme } from "@stackframe/react";
 import { stackClientApp } from "./stackframe/stack.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
-import NotFoundPage from "./pages/NotFoundPage.jsx";
+import NotFoundPage from "./pages/NotfoundPage.jsx";
 import QuestionnairePage from "./pages/QuestionnairePage.jsx";
 
 function HandlerRoutes() {
