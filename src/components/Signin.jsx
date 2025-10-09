@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { supabase } from "../utils/supabaseClient";
+import { stackClientApp } from "../stackframe/stack";
 
 export default function Signin({ setIsSigningIn }) {
   const [email, setEmail] = useState("");
@@ -21,15 +21,35 @@ export default function Signin({ setIsSigningIn }) {
 
   const handleSignIn = async (e) => {
     e.preventDefault();
-    setError("");
+    try {
+      if (!email || !password) {
+        setError("Please enter both email and password.");
+        return;
+      }
+      e.preventDefault();
+      setError("");
 
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) setError(error.message);
-    setLoading(false);
+      setLoading(true);
+      const result = await stackClientApp.signInWithCredential({
+        email,
+        password,
+      });
+      setLoading(false);
+
+      if (result?.status === "error") {
+        const message =
+          typeof result.error === "string"
+            ? result.error
+            : result.error?.message || String(result.error);
+        setError(message);
+        return;
+      }
+    } catch (err) {
+      setError(
+        "Failed to sign in. Please check your credentials and try again."
+      );
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,7 +90,11 @@ export default function Signin({ setIsSigningIn }) {
             className="absolute inset-y-0 right-0 pr-4 flex items-center text-purple-400 hover:text-purple-300 transition-colors duration-200"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
-            {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            {showPassword ? (
+              <EyeOff className="h-5 w-5" />
+            ) : (
+              <Eye className="h-5 w-5" />
+            )}
           </button>
         </div>
 
@@ -78,7 +102,9 @@ export default function Signin({ setIsSigningIn }) {
         {error && (
           <div className="relative z-50 p-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-slideDown">
             <div className="flex items-center justify-center space-x-2">
-              <p className="text-red-400 text-sm font-medium text-center">{error}</p>
+              <p className="text-red-400 text-sm font-medium text-center">
+                {error}
+              </p>
               <button
                 onClick={() => setError("")}
                 className="text-red-300 hover:text-red-100 transition-colors duration-200 text-lg font-bold leading-none ml-2"
@@ -122,4 +148,3 @@ export default function Signin({ setIsSigningIn }) {
     </div>
   );
 }
-

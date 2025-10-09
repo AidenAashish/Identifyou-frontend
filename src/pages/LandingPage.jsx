@@ -7,15 +7,89 @@ import {
   Target,
   ArrowRight,
 } from "lucide-react";
-import { supabase } from "../utils/supabaseClient";
+import { useUser } from "@stackframe/react";
 import { useNavigate } from "react-router-dom";
 import FormSidebar from "../components/FormSidebar";
+import axios from "axios";
+import { getEncryptedItem, removeEncryptedItem } from "../utils/encryption.js";
 
 function IdentifYouLanding() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [session, setSession] = useState(null);
+  const user = useUser({ or: 'return-null' });
 
   const navigate = useNavigate();
+
+  // Handle user authentication and database sync
+  useEffect(() => {
+    if (user) {
+      handleUserAuthentication(user);
+    }
+  }, [user]);
+
+  const handleUserAuthentication = async (user) => {
+    try {
+      console.log("🔍 Checking user in database:", user.primaryEmail);
+      
+      let userExistsInDB = false;
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users/${user.id}`
+        );
+        userExistsInDB = res.status === 200 && res.data;
+        console.log("🔍 User database check:", userExistsInDB ? "Found" : "Not found");
+      } catch (err) {
+        userExistsInDB = false;
+        console.log("🔍 User database check: Not found (API error)");
+      }
+
+      // Create user profile if they don't exist in DB
+      if (!userExistsInDB) {
+        try {
+          // Extract username from Stack Auth user object
+          const username = 
+            user.display_name ||          // "Jaini Aashish" from your example
+            user.displayName ||           // Alternative property name
+            user.primary_email?.split("@")[0] ||  // "aashish17405" from email
+            user.primaryEmail?.split("@")[0] ||   // Alternative property name
+            "User";
+
+          console.log("🔑 Creating user profile from landing page with data:", {
+            authId: user.id,
+            username: username,
+            email: user.primary_email || user.primaryEmail,
+            persona: "YOUNG_TEEN",
+          });
+
+          await axios.post(
+            `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users`,
+            {
+              authId: user.id,
+              username: username,
+              email: user.primary_email || user.primaryEmail,
+              persona: "YOUNG_TEEN",
+            }
+          );
+          
+          console.log("✅ User profile created successfully from landing page");
+          
+          // Clean up any OAuth flags since user is now processed
+          removeEncryptedItem("is_oauth_signup");
+          removeEncryptedItem("is_new_signup");
+          
+        } catch (error) {
+          console.error("❌ Error creating user profile from landing page:", error);
+        }
+      } else {
+        console.log("ℹ️ User already exists in database:", user.primary_email || user.primaryEmail);
+        
+        // Clean up any leftover flags for existing users
+        removeEncryptedItem("is_oauth_signup");
+        removeEncryptedItem("is_new_signup");
+      }
+    } catch (error) {
+      console.error("❌ Error in handleUserAuthentication:", error);
+    }
+  };
 
   useEffect(() => {
     // Prevent scrolling when mobile menu is open
@@ -29,37 +103,6 @@ function IdentifYouLanding() {
       document.body.style.overflow = "auto";
     };
   }, [isMenuOpen]);
-
-  useEffect(() => {
-    // Handle the auth callback
-    const handleAuthCallback = async () => {
-      // Check if there's a hash in the URL (OAuth callback)
-      if (window.location.hash) {
-        const { data, error } = await supabase.auth.getSession();
-        if (data.session) {
-          setSession(data.session);
-          return;
-        }
-      }
-
-      // Regular session check
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-      });
-    };
-
-    handleAuthCallback();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    // console.log(session);
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const navLinks = [
     { href: "#how-it-works", label: "How It Works" },
@@ -330,7 +373,7 @@ function IdentifYouLanding() {
           }
         `}
       </style>
-      {!session && <div className="fixed bottom-6 right-4 sm:right-6 z-50 animate-float-slow">
+      {!user && <div className="fixed bottom-6 right-4 sm:right-6 z-50 animate-float-slow">
         <button
           onClick={() => navigate("/auth")}
           className="bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-full shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 sm:space-x-3 border border-purple-500/20 max-w-xs sm:max-w-none"

@@ -11,10 +11,10 @@ import {
   decryptData,
 } from "../utils/encryption.js";
 import axios from "axios";
-import { supabase } from "../utils/supabaseClient.js";
+import { useUser } from "@stackframe/react";
 
 function ChatPage() {
-  const [session, setSession] = useState(null);
+  const user = useUser({ or: 'return-null' });
   const [currentStep, setCurrentStep] = useState("room");
   const [username, setUsername] = useState("");
   const [roomname, setRoomname] = useState("");
@@ -31,24 +31,11 @@ function ChatPage() {
     const initializeSession = async () => {
       setIsLoading(true);
       
-      // First, get the current session
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error) {
-        console.error("Error fetching session:", error);
-        setSession(null);
-        setIsLoading(false);
-        return;
-      }
-
-      const currentSession = data.session;
-      setSession(currentSession);
-
-      // If we have a session, set up the global name and restore state
-      if (currentSession?.user) {
-        await handleSessionRestore(currentSession);
+      // If we have a user, set up the global name and restore state
+      if (user?.id) {
+        await handleSessionRestore(user);
       } else {
-        // No session, check if we have saved data anyway (for guest mode or persistence)
+        // No user, check if we have saved data anyway (for guest mode or persistence)
         await handleLocalRestore();
       }
       
@@ -56,29 +43,12 @@ function ChatPage() {
     };
 
     initializeSession();
+  }, [user]);
 
-    // Keep session synced if it changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setSession(newSession);
-        if (newSession?.user) {
-          await setGlobalName(newSession);
-        } else {
-          // Session lost, check if we can restore from local storage
-          await handleLocalRestore();
-        }
-      }
-    );
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleSessionRestore = async (session) => {
+  const handleSessionRestore = async (user) => {
     try {
       // Set global name from API
-      await setGlobalName(session);
+      await setGlobalName(user);
       
       // Then restore room state
       await restoreRoomState();
@@ -171,16 +141,16 @@ function ChatPage() {
   };
 
   useEffect(() => {
-    if (!session?.user) {
+    if (!user?.id) {
       return
     }
     fetchRooms();
-  }, [session, currentStep]);
+  }, [user, currentStep]);
 
-  const setGlobalName = async (session) => {
+  const setGlobalName = async (user) => {
     try {
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users/${session.user.id}`
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users/${user.id}`
       );
 
       // console.log("Fetched user data:", response.data);
@@ -196,18 +166,18 @@ function ChatPage() {
     }
   };
 
-  const fetchRooms = async (sessionData = null) => {
+  const fetchRooms = async (userData = null) => {
     try {
-      // Use the provided session or the current session
-      const currentSession = sessionData || session;
+      // Use the provided user or the current user
+      const currentUser = userData || user;
 
-      if (!currentSession?.access_token || !currentSession?.user?.id) {
-        console.warn("No valid session found for fetching rooms");
+      if (!currentUser?.id) {
+        console.warn("No valid user found for fetching rooms");
         return;
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/rooms/${currentSession.user.id}`
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/rooms/${currentUser.id}`
       );
 
       setPrivateRooms(response.data.privateRooms || []);

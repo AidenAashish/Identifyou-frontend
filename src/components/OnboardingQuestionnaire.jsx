@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { ChevronRight, CheckCircle } from "lucide-react";
-import { supabase } from "../utils/supabaseClient.js";
 import { setEncryptedItem } from "../utils/encryption.js";
 
 export default function OnboardingQuestionnaire({ user, onComplete }) {
@@ -234,19 +233,11 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
       // Generate personalized room recommendations
       const recommendedRooms = getRecommendedRooms();
 
-      // Save questionnaire data to Supabase user metadata
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          onboarding_completed: true,
-          questionnaire_data: answers,
-          recommended_rooms: recommendedRooms,
-          questionnaire_completed_at: new Date().toISOString()
-        }
-      });
-
-      if (updateError) {
-        throw updateError;
-      }
+      // Save questionnaire data to localStorage (Stack doesn't have user metadata like Supabase)
+      setEncryptedItem("onboarding_completed", "true");
+      setEncryptedItem("questionnaire_data", JSON.stringify(answers));
+      setEncryptedItem("recommended_rooms", JSON.stringify(recommendedRooms));
+      setEncryptedItem("questionnaire_completed_at", new Date().toISOString());
 
       // Store recommended rooms and answers in encrypted localStorage
       setEncryptedItem('recommendedRooms', recommendedRooms);

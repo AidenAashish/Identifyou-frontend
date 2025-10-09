@@ -1,31 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../utils/supabaseClient';
+import { useUser, useStackApp } from '@stackframe/react';
 import { Menu, X, Home, User, LogOut, MessageCircle, Settings } from 'lucide-react';
 import RoomSidebar from './RoomSidebar';
 
 function FormSidebar({ isLandingPage = false, privateRooms = [], publicRooms = [] }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [session, setSession] = useState(null);
-  const [user, setUser] = useState(null);
+  const stackApp = useStackApp();
+  const user = useUser({ or: 'return-null' });
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    // Stack auth state is managed by useUser hook automatically
+    // No need for manual session management
   }, []);
 
   // Prevent body scroll when sidebar is open
@@ -43,7 +30,7 @@ function FormSidebar({ isLandingPage = false, privateRooms = [], publicRooms = [
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      await user.signOut();
       setIsOpen(false);
       if (isLandingPage) {
         // Stay on landing page after sign out and reload to update UI
@@ -132,15 +119,15 @@ function FormSidebar({ isLandingPage = false, privateRooms = [], publicRooms = [
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-semibold text-sm">
-                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                    {(user.displayName || user.primaryEmail)?.charAt(0).toUpperCase() || 'U'}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium text-sm truncate">
-                    {user.user_metadata?.name || user.email?.split('@')[0] || 'User'}
+                    {user.displayName || user.primaryEmail?.split('@')[0] || 'User'}
                   </p>
                   <p className="text-gray-400 text-xs truncate">
-                    {user.email}
+                    {user.primaryEmail}
                   </p>
                 </div>
               </div>

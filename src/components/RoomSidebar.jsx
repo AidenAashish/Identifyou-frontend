@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../utils/supabaseClient";
+import { useUser } from "@stackframe/react";
 import { Menu, X, Users, Lock, Quote, Lightbulb, MessageSquareLock, MessagesSquare, MessageSquare, MessageSquareText, MessageSquareMore } from "lucide-react";
 import axios from "axios";
 import {
@@ -10,28 +10,9 @@ import {
 
 function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publicRooms }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [session, setSession] = useState(null);
   const [recommendedRooms, setRecommendedRooms] = useState([]);
-  const [user, setUser] = useState(null);
+  const user = useUser({ or: 'return-null' });
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   // Prevent body scroll when sidebar is open on mobile
   useEffect(() => {

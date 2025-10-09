@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../utils/supabaseClient.js";
+import { useUser } from "@stackframe/react";
 import FormSidebar from "./FormSidebar";
 import BackButton from "./ui/BackButton";
 import { getEncryptedJSON } from "../utils/encryption.js";
@@ -23,19 +23,12 @@ function RoomForm({
   const [newRoomName, setNewRoomName] = useState("");
   const [roomType, setRoomType] = useState("public");
   const [isCreating, setIsCreating] = useState(false);
-  const [user, setUser] = useState(null);
+  const user = useUser({ or: 'return-null' });
   const [rooms, setRooms] = useState([]);
   const [filteredRooms, setFilteredRooms] = useState([
     ...publicRooms,
     ...privateRooms,
   ]);
-
-  useEffect(() => {
-    // Get current user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user);
-    });
-  }, []);
 
   // Handle room click from sidebar
   const handleRoomClick = (roomData) => {
@@ -157,12 +150,9 @@ function RoomForm({
 
       // Step 2: Store room information in Express API
       console.log("Storing room information in Express API...");
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error("No valid session found. Please log in again.");
+      
+      if (!user?.id) {
+        throw new Error("No valid user found. Please log in again.");
       }
 
       const expressApiUrl =
@@ -173,11 +163,10 @@ function RoomForm({
           roomId: roomId,
           roomName: newRoomName.trim(),
           roomType: roomType.toUpperCase(),
-          userId: session.user.id,
+          userId: user.id,
         },
         {
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
             "Content-Type": "application/json",
           },
         }

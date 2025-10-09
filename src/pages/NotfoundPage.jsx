@@ -1,27 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "../utils/supabaseClient.js";
+import { useUser } from "@stackframe/react";
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
-  const [session, setSession] = useState(null);
-
-  useEffect(() => {
-    const fetchSession = async () => {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-      if (error) {
-        console.error("Error fetching session:", error);
-      } else {
-        setSession(session);
-        console.log("Current session:", session);
-      }
-    };
-
-    fetchSession();
-  }, []);
+  const user = useUser({ or: 'return-null' });
 
   return (
     <div className="min-h-screen bg-gray-900 text-white overflow-hidden relative">
@@ -97,7 +80,7 @@ export default function NotFoundPage() {
             >
               Chat
             </button>
-            {!session && (
+            {!user && (
                 <>
                   <span className="text-gray-600">|</span>
                   <button

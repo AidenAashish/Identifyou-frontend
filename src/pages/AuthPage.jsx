@@ -1,50 +1,36 @@
 import { useState, useEffect } from "react";
-import { supabase } from "../utils/supabaseClient.js";
-import { replace, useNavigate } from "react-router-dom";
 import Signin from "../components/Signin";
 import Signup from "../components/Signup";
 import { getEncryptedItem, removeEncryptedItem } from "../utils/encryption.js";
 import axios from "axios";
+import { useUser, useStackApp } from "@stackframe/react";
+import { useNavigate } from "react-router-dom";
+import { setEncryptedItem } from "../utils/encryption.js";
 
 export default function AuthPage() {
+  const app = useStackApp();
+  const user = useUser({ or: 'return-null' });
   const [isSigningIn, setIsSigningIn] = useState(true);
-  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState(getEncryptedItem("name") || "User");
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      const sessionData = data?.session;
-      setSession(sessionData);
-      setLoading(false);
-      if (sessionData) await checkOnboardingStatus(sessionData.user);
-    };
-
-    handleAuthCallback();
-
+    setLoading(false);
     setUsername(getEncryptedItem("name") || "User");
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      setLoading(false);
-      if (session) await checkOnboardingStatus(session.user);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, session]);
+    
+    // Check if user is authenticated and handle onboarding
+    if (user) {
+      checkOnboardingStatus(user);
+    }
+  }, [user, navigate]);
 
   const checkOnboardingStatus = async (user) => {
     if (!user) return;
 
-    const onboardingCompleted =
-      user.user_metadata?.onboarding_completed === true;
+    const onboardingCompleted = false; // Stack doesn't have user_metadata, handle differently
     const isNewSignup = getEncryptedItem("is_new_signup") === "true";
-    const isNewUser = isNewSignup || user.user_metadata?.is_new_user === true;
-    const isNewOAuthUser = !user.user_metadata?.profile_created && !isNewSignup;
+    const isOAuthSignup = getEncryptedItem("is_oauth_signup") === "true";
 
     let userExistsInDB = false;
     try {
@@ -52,66 +38,87 @@ export default function AuthPage() {
         `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users/${user.id}`
       );
       userExistsInDB = res.status === 200 && res.data;
+      console.log("🔍 User database check:", userExistsInDB ? "Found" : "Not found");
     } catch (err) {
       userExistsInDB = false;
+      console.log("🔍 User database check: Not found (API error)");
     }
+    
+    // Also detect OAuth users by checking if they don't exist in our DB
+    // This handles cases where user comes back or localStorage was cleared
+    const isPotentialOAuthUser = !userExistsInDB && !isNewSignup;
+    
+    const isNewUser = isNewSignup || isOAuthSignup || (!userExistsInDB);
 
-    // Only create profile for OAuth users
+    // Create user profile if they don't exist in DB
     if (!userExistsInDB) {
       try {
-        const oauthUsername =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.email?.split("@")[0] ||
-          "User";
+        let username;
+        
+        if (isOAuthSignup || isPotentialOAuthUser) {
+          // For OAuth users, try to get name from user object
+          username = 
+            user.displayName || // Stack's display name for OAuth users
+            user.primaryEmail?.split("@")[0] ||
+            "User";
+          console.log("🔑 Creating OAuth user profile with username:", username);
+        } else {
+          // For regular signup users, prefer the form data
+          username = 
+            getEncryptedItem("name") || // From signup form
+            user.displayName ||
+            user.primaryEmail?.split("@")[0] ||
+            "User";
+          console.log("📝 Creating regular signup user profile with username:", username);
+        }
 
         await Promise.all([
           axios.post(
             `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/users`,
             {
               authId: user.id,
-              username: oauthUsername,
-              email: user.email,
+              username: username,
+              email: user.primaryEmail,
               persona: "YOUNG_TEEN",
             }
           ),
-          supabase.auth.updateUser({
-            data: { profile_created: true },
-          }),
         ]);
-        console.log("✅ OAuth user profile created successfully");
+        console.log("✅ User profile created successfully for", 
+          (isOAuthSignup || isPotentialOAuthUser) ? "OAuth user" : "regular user");
       } catch (error) {
-        console.error("❌ Error creating OAuth user profile:", error);
+        console.error("❌ Error creating user profile:", error);
       }
-    } else if (isNewSignup) {
-      try {
-        await supabase.auth.updateUser({
-          data: { profile_created: true },
-        });
-        console.log("Marked regular signup profile as created");
-      } catch (error) {
-        console.error("Error updating profile_created flag:", error);
-      }
+    } else {
+      console.log("ℹ️ User already exists in database:", user.primaryEmail);
     }
 
     // Redirect
-    if (!onboardingCompleted && (isNewUser || isNewOAuthUser)) {
+    if (!onboardingCompleted && isNewUser) {
+      // Clean up signup flags
       removeEncryptedItem("is_new_signup");
+      removeEncryptedItem("is_oauth_signup");
+      removeEncryptedItem("name"); // Clean up stored name from forms
+      console.log("🚀 Redirecting new user to questionnaire");
       window.location.href = "/questionnaire";
     } else {
+      // Clean up flags for existing users too
+      removeEncryptedItem("is_new_signup");
+      removeEncryptedItem("is_oauth_signup");
+      removeEncryptedItem("name");
+      console.log("🏠 Redirecting existing user to chat");
       window.location.href = "/chat";
     }
   };
 
   const signUpWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth`,
-        queryParams: { prompt: "select_account" },
-      },
-    });
-    if (error) console.log("Error signing in:", error.message);
+    try {
+      // Mark this as an OAuth signup/signin to handle it properly in checkOnboardingStatus
+      setEncryptedItem("is_oauth_signup", "true");
+      await app.signInWithOAuth("google");
+    } catch (error) {
+      console.error("❌ OAuth signup/signin error:", error);
+      removeEncryptedItem("is_oauth_signup");
+    }
   };
 
   if (loading) {
@@ -125,7 +132,7 @@ export default function AuthPage() {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-900 text-white overflow-hidden relative">
         {/* Animated background */}
@@ -156,7 +163,7 @@ export default function AuthPage() {
             {/* Toggle buttons */}
             <div className="flex bg-gray-800/50 backdrop-blur-lg rounded-2xl p-2 border border-purple-500/20">
               <button
-                onClick={() => setIsSigningIn(true)}
+                onClick={() => app.redirectToSignIn()}
                 className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
                   isSigningIn
                     ? "bg-purple-600 text-white shadow-lg"
@@ -213,7 +220,7 @@ export default function AuthPage() {
     );
   } else {
     return (
-      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center space-y-6">
           <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
             <div className="w-8 h-8 bg-green-500 rounded-full"></div>

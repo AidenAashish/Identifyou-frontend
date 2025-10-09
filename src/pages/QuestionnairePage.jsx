@@ -1,21 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import OnboardingQuestionnaire from "../components/OnboardingQuestionnaire";
-import { supabase } from "../utils/supabaseClient";
+import { useUser } from "@stackframe/react";
 
 export default function QuestionnairePage() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
-    };
-    getUser();
-  }, []);
+  const user = useUser({ or: 'return-null' });
+  const loading = user === undefined;
 
   const handleQuestionnaireComplete = () => {
     navigate("/chat", { replace: true });

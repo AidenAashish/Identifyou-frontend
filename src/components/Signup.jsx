@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, Mail, Lock, CheckCircle, User } from "lucide-react";
-import { supabase } from "../utils/supabaseClient.js";
 import { setEncryptedItem } from "../utils/encryption.js";
+import { stackClientApp } from "../stackframe/stack";
 import axios from "axios";
 
 export default function Signup({ setIsSigningIn }) {
@@ -14,6 +14,7 @@ export default function Signup({ setIsSigningIn }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [profileCreated, setProfileCreated] = useState(false);
 
   // Auto-dismiss error after 4 seconds
   useEffect(() => {
@@ -27,74 +28,117 @@ export default function Signup({ setIsSigningIn }) {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    setError("");
+    try {
+      setError("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
-      return;
-    }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      // Server expects minimum length 8
+      if (password.length < 8) {
+        setError("Password must be at least 8 characters long.");
+        return;
+      }
 
-    setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          onboarding_completed: false,
-          is_new_user: true,
-        },
-      },
-    });
+      setLoading(true);
+      const result = await stackClientApp.signUpWithCredential({
+        email,
+        password,
+      });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      // Mark in localStorage that this is a new signup
+      console.log("Signup result:", result);
+
+      if (result?.status === "error") {
+        // Convert KnownError / Error objects to a readable string to avoid React rendering issues
+        const message =
+          typeof result.error === "string"
+            ? result.error
+            : result.error?.message || String(result.error);
+        setError(message);
+        setLoading(false);
+        return;
+      }
+
+      // Mark in localStorage that this is a new signup and store username
       setEncryptedItem("is_new_signup", "true");
-      setSuccess(true);
-      if (data?.user) {
+      setEncryptedItem("name", username);
+      
+      // Try multiple strategies to get user ID and create profile immediately
+      let userCreated = false;
+      
+      try {
+        console.log("Strategy 1: Trying to get current user immediately after signup...");
+        const currentUser = await stackClientApp.getUser({ or: 'return-null' });
+        
+        if (currentUser?.id) {
+          console.log("✅ Got user immediately:", currentUser.id);
+          await createUserProfile(currentUser.id, username, email);
+          userCreated = true;
+          setProfileCreated(true);
+        }
+      } catch (error) {
+        console.log("Strategy 1 failed:", error.message);
+      }
+
+      if (!userCreated) {
         try {
-          const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-          console.log("Creating user profile at:", `${apiUrl}/users`);
-          console.log("User data:", {
-            authId: data.user.id,
-            username: username,
-            persona: "YOUNG_TEEN"
+          console.log("Strategy 2: Attempting immediate sign-in after signup...");
+          const signInResult = await stackClientApp.signInWithCredential({
+            email,
+            password,
+            noRedirect: true,
           });
-          
-          // Create user profile in backend and update metadata concurrently
-          const [response] = await Promise.all([
-            axios.post(
-              `${apiUrl}/users`,
-              {
-                authId: data.user.id,
-                email: email,
-                username: username, // Use the username from the form, not metadata
-                persona: "YOUNG_TEEN"
-              }
-            ),
-            // Mark profile as created in user metadata
-            supabase.auth.updateUser({
-              data: {
-                profile_created: true,
-              },
-            })
-          ]);
-          setEncryptedItem("name", username)  // This should be implemented using redux/zoustand in further steps
-          console.log("User profile created:", response.data);
-        } catch (e) {
-          console.error("Error creating user profile:", e);
-          console.error("Error response:", e.response?.data);
-          console.error("Error status:", e.response?.status);
-          setError("Error creating user profile. Please try again.");
+
+          if (signInResult?.status === "ok") {
+            const currentUser = await stackClientApp.getUser({ or: 'return-null' });
+            
+            if (currentUser?.id) {
+              console.log("✅ Got user after immediate sign-in:", currentUser.id);
+              await createUserProfile(currentUser.id, username, email);
+              userCreated = true;
+              setProfileCreated(true);
+            }
+          }
+        } catch (error) {
+          console.log("Strategy 2 failed:", error.message);
         }
       }
+
+      if (!userCreated) {
+        console.log("⚠️ Immediate profile creation not possible, will happen after email verification");
+      }
+      
+      setSuccess(true);
+      setLoading(false);
+    } catch (err) {
+      setError("Failed to sign up. Please try again.");
+      setLoading(false);
+      console.error("Signup error:", err);
     }
-    setLoading(false);
+  };
+
+  const createUserProfile = async (authId, username, email) => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+    console.log("Creating user profile at:", `${apiUrl}/users`);
+    console.log("User data:", {
+      authId,
+      username,
+      email,
+      persona: "YOUNG_TEEN",
+    });
+
+    const [response] = await Promise.all([
+      axios.post(`${apiUrl}/users`, {
+        authId,
+        username,
+        email,
+        persona: "YOUNG_TEEN",
+      }),
+    ]);
+    
+    console.log("✅ User profile created successfully:", response.data);
+    return response.data;
   };
 
   const getPasswordStrength = () => {
@@ -130,11 +174,24 @@ export default function Signup({ setIsSigningIn }) {
             <CheckCircle className="w-8 h-8 text-green-400" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-4">
-            Check Your Email!
+            {profileCreated ? "Account Created!" : "Check Your Email!"}
           </h2>
           <p className="text-gray-300 leading-relaxed">
-            We've sent a verification link to{" "}
-            <span className="font-medium text-purple-400">{email}</span>.
+            {profileCreated ? (
+              <>
+                Your account has been created successfully! We've sent a verification link to{" "}
+                <span className="font-medium text-purple-400">{email}</span>.
+                <br />
+                <span className="text-green-400 text-sm mt-2 block">✅ Profile saved to database</span>
+              </>
+            ) : (
+              <>
+                We've sent a verification link to{" "}
+                <span className="font-medium text-purple-400">{email}</span>.
+                <br />
+                <span className="text-yellow-400 text-sm mt-2 block">⏳ Profile will be saved after verification</span>
+              </>
+            )}
           </p>
         </div>
       </div>
