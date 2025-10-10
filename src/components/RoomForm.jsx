@@ -23,7 +23,7 @@ function RoomForm({
   const [newRoomName, setNewRoomName] = useState("");
   const [roomType, setRoomType] = useState("public");
   const [isCreating, setIsCreating] = useState(false);
-  const user = useUser({ or: 'return-null' });
+  const user = useUser({ or: "return-null" });
   const [rooms, setRooms] = useState([]);
   const [filteredRooms, setFilteredRooms] = useState([
     ...publicRooms,
@@ -124,6 +124,30 @@ function RoomForm({
       return;
     }
 
+    // Normalize room name for comparison when creating public rooms
+    const trimmedName = newRoomName.trim();
+    const normalizedPublicName = trimmedName.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
+
+    // Choose the name to check in DB: for public rooms use normalizedPublicName, for private use trimmedName
+    const nameToCheck = roomType.toUpperCase() === "PUBLIC" ? normalizedPublicName : trimmedName;
+
+    setIsCreating(true);
+    let existingRoom = null;
+    try {
+      existingRoom = await axios.get(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/rooms/existing?roomName=${encodeURIComponent(nameToCheck)}&userId=${user.id}&roomType=${roomType.toUpperCase()}`
+      );
+    } catch (err) {
+      console.warn("Could not check existing rooms (API error)", err?.message || err);
+      existingRoom = null;
+    }
+
+    if (existingRoom?.data?.existingRoom === true) {
+      console.log("Room with these details already exists for you.");
+      onError("Room with these details already exists!");
+      return;
+    }
+
     setIsCreating(true);
     try {
       // Step 1: Create room in Wrangler (Cloudflare Workers) to get unique roomId
@@ -150,7 +174,7 @@ function RoomForm({
 
       // Step 2: Store room information in Express API
       console.log("Storing room information in Express API...");
-      
+
       if (!user?.id) {
         throw new Error("No valid user found. Please log in again.");
       }
@@ -194,8 +218,8 @@ function RoomForm({
     } catch (err) {
       console.error("Error creating room:", err);
       const errorMessage =
-        err.response?.data?.message || err.message || "Failed to create room";
-      onError(`Error creating room: ${errorMessage}`);
+        err.response?.data?.error || err.message || "Failed to create room";
+      onError(`${errorMessage}`);
     } finally {
       setIsCreating(false);
     }
@@ -316,7 +340,7 @@ function RoomForm({
                             ? filteredRooms.map((room, index) => (
                                 <button
                                   key={index}
-                                  className={`w-full text-left px-3 py-2 text-sm text-white rounded-lg transition-all duration-200 flex items-center justify-between ${room.isRecommended ? "hover:bg-purple-600/30" : publicRooms.find((r) => r.name === room.name) ? "hover:bg-green-600/30" : "hover:bg-blue-600/30"}`}
+                                  className={`w-full text-left px-3 py-2 text-sm text-white rounded-lg transition-all duration-200 flex items-center justify-between ${room.isRecommended ? "hover:bg-purple-600/30" : publicRooms.find((r) => r.id === room.id) ? "hover:bg-green-600/30" : "hover:bg-blue-600/30"}`}
                                   onClick={() => {
                                     setRoomName(room.name);
                                     setShowDropdown(false);
@@ -328,7 +352,7 @@ function RoomForm({
                                         room.isRecommended
                                           ? "bg-purple-400"
                                           : publicRooms.find(
-                                                (r) => r.name === room.name
+                                                (r) => r.id === room.id
                                               )
                                             ? "bg-green-400"
                                             : "bg-blue-400"

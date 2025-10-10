@@ -24,7 +24,7 @@ function IdentifYouLanding() {
     if (user) {
       handleUserAuthentication(user);
     }
-  }, [user]);
+  }, []);
 
   const handleUserAuthentication = async (user) => {
     try {
