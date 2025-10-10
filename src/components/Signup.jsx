@@ -63,14 +63,16 @@ export default function Signup({ setIsSigningIn }) {
       // Mark in localStorage that this is a new signup and store username
       setEncryptedItem("is_new_signup", "true");
       setEncryptedItem("name", username);
-      
+
       // Try multiple strategies to get user ID and create profile immediately
       let userCreated = false;
-      
+
       try {
-        console.log("Strategy 1: Trying to get current user immediately after signup...");
-        const currentUser = await stackClientApp.getUser({ or: 'return-null' });
-        
+        console.log(
+          "Strategy 1: Trying to get current user immediately after signup..."
+        );
+        const currentUser = await stackClientApp.getUser({ or: "return-null" });
+
         if (currentUser?.id) {
           console.log("✅ Got user immediately:", currentUser.id);
           await createUserProfile(currentUser.id, username, email);
@@ -83,7 +85,9 @@ export default function Signup({ setIsSigningIn }) {
 
       if (!userCreated) {
         try {
-          console.log("Strategy 2: Attempting immediate sign-in after signup...");
+          console.log(
+            "Strategy 2: Attempting immediate sign-in after signup..."
+          );
           const signInResult = await stackClientApp.signInWithCredential({
             email,
             password,
@@ -91,10 +95,15 @@ export default function Signup({ setIsSigningIn }) {
           });
 
           if (signInResult?.status === "ok") {
-            const currentUser = await stackClientApp.getUser({ or: 'return-null' });
-            
+            const currentUser = await stackClientApp.getUser({
+              or: "return-null",
+            });
+
             if (currentUser?.id) {
-              console.log("✅ Got user after immediate sign-in:", currentUser.id);
+              console.log(
+                "✅ Got user after immediate sign-in:",
+                currentUser.id
+              );
               await createUserProfile(currentUser.id, username, email);
               userCreated = true;
               setProfileCreated(true);
@@ -106,9 +115,11 @@ export default function Signup({ setIsSigningIn }) {
       }
 
       if (!userCreated) {
-        console.log("⚠️ Immediate profile creation not possible, will happen after email verification");
+        console.log(
+          "⚠️ Immediate profile creation not possible, will happen after email verification"
+        );
       }
-      
+
       setSuccess(true);
       setLoading(false);
     } catch (err) {
@@ -136,7 +147,7 @@ export default function Signup({ setIsSigningIn }) {
         persona: "YOUNG_TEEN",
       }),
     ]);
-    
+
     console.log("✅ User profile created successfully:", response.data);
     return response.data;
   };
@@ -168,31 +179,19 @@ export default function Signup({ setIsSigningIn }) {
 
   if (success) {
     return (
-      <div className="w-full p-8 bg-gray-800/50 backdrop-blur-lg rounded-2xl shadow-2xl border border-green-500/30 animate-fadeIn">
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-6 border-2 border-green-500/20">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center space-y-6">
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-8 h-8 bg-green-500 rounded-full"></div>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-4">
-            {profileCreated ? "Account Created!" : "Check Your Email!"}
-          </h2>
-          <p className="text-gray-300 leading-relaxed">
-            {profileCreated ? (
-              <>
-                Your account has been created successfully! We've sent a verification link to{" "}
-                <span className="font-medium text-purple-400">{email}</span>.
-                <br />
-                <span className="text-green-400 text-sm mt-2 block">✅ Profile saved to database</span>
-              </>
-            ) : (
-              <>
-                We've sent a verification link to{" "}
-                <span className="font-medium text-purple-400">{email}</span>.
-                <br />
-                <span className="text-yellow-400 text-sm mt-2 block">⏳ Profile will be saved after verification</span>
-              </>
-            )}
-          </p>
+          <h2 className="text-2xl font-bold">Welcome, {username}</h2>
+          <p className="text-gray-300">You are now signed in!</p>
+          <button
+            className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300"
+            onClick={() => (window.location.href = "/questionnaire")}
+          >
+            Answer Onboarding Questions
+          </button>
         </div>
       </div>
     );

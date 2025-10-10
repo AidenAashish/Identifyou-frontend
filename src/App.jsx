@@ -37,6 +37,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/room/:roomId"
+                element={
+                  <ProtectedRoute>
+                    <ChatPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/auth" element={<AuthPage />} />
               <Route
                 path="/questionnaire"
