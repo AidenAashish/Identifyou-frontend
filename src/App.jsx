@@ -11,7 +11,7 @@ import { stackClientApp } from "./stackframe/stack.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import QuestionnairePage from "./pages/QuestionnairePage.jsx";
-import NotFoundPage from "./pages/NotFoundPage.jsx";
+import NotFoundPage from "./pages/NotFoundErrorPage.jsx";
 
 function HandlerRoutes() {
   const location = useLocation();

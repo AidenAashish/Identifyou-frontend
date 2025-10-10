@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@stackframe/react";
 
-const NotFoundPage = () => {
+const NotFoundErrorPage = () => {
   const navigate = useNavigate();
   const user = useUser({ or: 'return-null' });
 
@@ -97,4 +97,4 @@ const NotFoundPage = () => {
   );
 }
 
-export default NotFoundPage;
+export default NotFoundErrorPage;
