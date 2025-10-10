@@ -1,5 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { useUser } from "@stackframe/react";
 
 function NotFoundPage() {
