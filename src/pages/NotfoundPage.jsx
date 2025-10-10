@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@stackframe/react";
 
-function NotFoundPage() {
+const NotFoundPage = () => {
   const navigate = useNavigate();
   const user = useUser({ or: 'return-null' });
 
