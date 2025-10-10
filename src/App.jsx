@@ -10,8 +10,8 @@ import { StackHandler, StackProvider, StackTheme } from "@stackframe/react";
 import { stackClientApp } from "./stackframe/stack.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
-import NotFoundPage from "./pages/NotFoundPage.jsx";
 import QuestionnairePage from "./pages/QuestionnairePage.jsx";
+import NotFoundPage from "./pages/NotFoundPage.jsx";
 
 function HandlerRoutes() {
   const location = useLocation();

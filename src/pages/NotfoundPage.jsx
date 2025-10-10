@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useUser } from "@stackframe/react";
 
-export default function NotFoundPage() {
+function NotFoundPage() {
   const navigate = useNavigate();
   const user = useUser({ or: 'return-null' });
 
@@ -97,3 +97,5 @@ export default function NotFoundPage() {
     </div>
   );
 }
+
+export default NotFoundPage;
