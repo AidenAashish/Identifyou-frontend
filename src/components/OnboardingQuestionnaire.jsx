@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, CheckCircle } from "lucide-react";
-import { setEncryptedItem } from "../utils/encryption.js";
+import { getEncryptedJSON, setEncryptedItem } from "../utils/encryption.js";
+import { useNavigate } from "react-router-dom";
 
 export default function OnboardingQuestionnaire({ user, onComplete }) {
   const [currentStep, setCurrentStep] = useState(1);
+  const navigate = useNavigate();
   const [answers, setAnswers] = useState({
     age: "",
     gender: "",
@@ -111,6 +113,15 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
 
   const currentQuestion = questions.find(q => q.id === currentStep);
   const totalSteps = questions.length;
+
+  useEffect(() => {
+    const ExistingRecommendedRooms = getEncryptedJSON('recommendedRooms');
+    if(ExistingRecommendedRooms && ExistingRecommendedRooms.length > 0) {
+      console.log("✅ Recommended rooms already exist:", ExistingRecommendedRooms);
+      navigate('/chat');
+      return;
+    }
+  }, []);
 
   const handleInputChange = (fieldName, value) => {
     if (fieldName === "goals") {
@@ -235,13 +246,12 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
 
       // Save questionnaire data to localStorage (Stack doesn't have user metadata like Supabase)
       setEncryptedItem("onboarding_completed", "true");
-      setEncryptedItem("questionnaire_data", JSON.stringify(answers));
-      setEncryptedItem("recommended_rooms", JSON.stringify(recommendedRooms));
-      setEncryptedItem("questionnaire_completed_at", new Date().toISOString());
+      // setEncryptedItem("questionnaire_data", JSON.stringify(answers));
+      // setEncryptedItem("questionnaire_completed_at", new Date().toISOString());
 
       // Store recommended rooms and answers in encrypted localStorage
       setEncryptedItem('recommendedRooms', recommendedRooms);
-      setEncryptedItem('questionnaireAnswers', answers);
+      // setEncryptedItem('questionnaireAnswers', answers);
       setEncryptedItem('onboarding_completed', 'true');
 
       onComplete();

@@ -163,7 +163,7 @@ export default function AuthPage() {
             {/* Toggle buttons */}
             <div className="flex bg-gray-800/50 backdrop-blur-lg rounded-2xl p-2 border border-purple-500/20">
               <button
-                onClick={() => setIsSigningIn(true)}
+                onClick={() => app.redirectToSignIn()}
                 className={`flex-1 py-3 px-4 rounded-xl font-medium transition-all duration-300 ${
                   isSigningIn
                     ? "bg-purple-600 text-white shadow-lg"

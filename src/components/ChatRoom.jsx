@@ -1,172 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-// import { Filter } from "bad-words";
 import leoProfanity from "leo-profanity";
 
-// const profanityFilter = new Filter();
-
-// Add custom words to the filter
 leoProfanity.add([
+  // Your custom words array (unchanged)
   "fuck","shit","bitch","bastard","asshole","dick","pussy","cunt","damn","crap","bollocks","bugger","fucker","motherfucker","cock","prick","twat","douche","slut","whore","arse","arsehole",
-  
-  // Sexual / inappropriate
   "sex","porn","nude","naked","slut","whore","cock","penis","vagina","rape","orgy","boobs","tits","cum","ejaculate","blowjob","handjob","masturbate","hentai","xxx","fetish",
-
-  // Violence / threats
-  "kill",
-  "murder",
-  "stab",
-  "shoot",
-  "bomb",
-  "gun",
-  "terrorist",
-  "die",
-  "slap",
-  "punch",
-  "hurt",
-  "destroy",
-  "assault",
-  "behead",
-  "choke",
-  "fight",
-  "brawl",
-  "attack",
-  "kill yourself",
-  "hang",
-  "shoot yourself",
-
-  // Bullying / shaming / derogatory terms
-  "loser",
-  "idiot",
-  "stupid",
-  "dumb",
-  "fat",
-  "ugly",
-  "retard",
-  "moron",
-  "nerd",
-  "faggot",
-  "dyke",
-  "bitchy",
-  "weirdo",
-  "loser",
-  "lame",
-  "jerk",
-  "coward",
-  "scum",
-  "loser",
-  "losing",
-  "suck",
-  "loserface",
-
-  // Hate speech / racial slurs
-  "nigger",
-  "chink",
-  "spic",
-  "kike",
-  "gook",
-  "wetback",
-  "coon",
-  "slant",
-  "raghead",
-  "towelhead",
-  "cracker",
-  "wop",
-  "hebe",
-  "beaner",
-  "gypsy",
-  "oriental",
-  "injun",
-
-  // Self-harm / sensitive topics
-  "suicide",
-  "cutting",
-  "hang",
-  "kill myself",
-  "die myself",
-  "depress",
-  "self-harm",
-  "anorexia",
-  "bulimia",
-  "starve",
-  "faint",
-  "die alone",
-  "cry",
-  "worthless",
-  "worthlessness",
-
-  // Drugs / alcohol / substance abuse
-  "drugs",
-  "cocaine",
-  "heroin",
-  "meth",
-  "weed",
-  "marijuana",
-  "alcohol",
-  "binge",
-  "addict",
-  "stoned",
-  "stoner",
-  "smoke weed",
-  "ecstasy",
-  "lsd",
-  "molly",
-  "crack",
-  "hash",
-  "opiate",
-  "pill",
-  "tripping",
-
-  // Other slang / offensive
-  "slap",
-  "shithead",
-  "fuckhead",
-  "dumbass",
-  "asshat",
-  "twatface",
-  "dipshit",
-  "tard",
-  "idiotface",
-  "asswipe",
-  "numbnuts",
-  "butthole",
-  "douchebag",
-  "wanker",
-  "bloody",
-  "bollocks",
-  "arsewipe",
-  "piss off",
-  "screw you",
-  "dammit",
-  "crappy",
-  "loserish",
-  "moronic",
-  "shitbag",
-  "fuckboy",
-  "fuckgirl",
-
-  // Sexual harassment / non-consent
-  "rape",
-  "molest",
-  "harass",
-  "stalk",
-  "fondle",
-  "touch me",
-  "grope",
-  "perv",
-  "pervert",
-  "pedo",
-  "paedo",
-
-  // Extreme violence
-  "torture",
-  "beating",
-  "lynch",
-  "massacre",
-  "slaughter",
-  "exterminate",
-  "execute",
-  "kill them all",
-  "chop off"
+  "kill","murder","stab","shoot","bomb","gun","terrorist","die","slap","punch","hurt","destroy","assault","behead","choke","fight","brawl","attack","kill yourself","hang","shoot yourself",
+  "loser","idiot","stupid","dumb","fat","ugly","retard","moron","nerd","faggot","dyke","bitchy","weirdo","loser","lame","jerk","coward","scum","loser","losing","suck","loserface",
+  "nigger","chink","spic","kike","gook","wetback","coon","slant","raghead","towelhead","cracker","wop","hebe","beaner","gypsy","oriental","injun",
+  "suicide","cutting","hang","kill myself","die myself","depress","self-harm","anorexia","bulimia","starve","faint","die alone","cry","worthless","worthlessness",
+  "drugs","cocaine","heroin","meth","weed","marijuana","alcohol","binge","addict","stoned","stoner","smoke weed","ecstasy","lsd","molly","crack","hash","opiate","pill","tripping",
+  "slap","shithead","fuckhead","dumbass","asshat","twatface","dipshit","tard","idiotface","asswipe","numbnuts","butthole","douchebag","wanker","bloody","bollocks","arsewipe","piss off","screw you","dammit","crappy","loserish","moronic","shitbag","fuckboy","fuckgirl",
+  "rape","molest","harass","stalk","fondle","touch me","grope","perv","pervert","pedo","paedo",
+  "torture","beating","lynch","massacre","slaughter","exterminate","execute","kill them all","chop off"
 ]);
 
 function ChatRoom({ username, roomname, onError, onDisconnect, displayName, roomType }) {
@@ -179,296 +25,139 @@ function ChatRoom({ username, roomname, onError, onDisconnect, displayName, room
   const [isProcessingBacklog, setIsProcessingBacklog] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const webSocketRef = useRef(null);
+  const [roomKey, setRoomKey] = useState(0); // Used to force reconnect
+
   const chatlogRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
+  const socketRef = useRef(null);
+  const userIsInRoomRef = useRef(true);
 
   const userCount = connectedUsers.length;
 
   useEffect(() => {
-    connectToRoom();
-    // Reset connected users when connecting to a new room
-    setConnectedUsers([]);
-    // console.log(`🏠 Connecting to room: ${roomname}`);
+    userIsInRoomRef.current = true;
 
-    return () => {
-      // Clear all timeouts and intervals
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const host = import.meta.env.VITE_HOST_NAME || "127.0.0.1:8787";
+    const cleanedRoomname = roomname.match(/^[0-9a-f]{64}$/i)
+      ? roomname
+      : roomname.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
+
+    const wsUrl = `${protocol}${host}/api/room/${cleanedRoomname}/websocket`;
+    console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
+
+    const ws = new WebSocket(wsUrl);
+    socketRef.current = ws;
+
+    const startHeartbeat = () => {
+      if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30000);
+    };
+
+    const stopHeartbeat = () => {
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current);
         heartbeatIntervalRef.current = null;
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      if (webSocketRef.current) {
-        webSocketRef.current.close(1000, "Component unmounting");
-        webSocketRef.current = null;
+    };
+
+    ws.onopen = () => {
+      console.log("✅ Connected to room");
+      setIsConnected(true);
+      setIsConnecting(false);
+      setReadyToChat(false);
+      setIsProcessingBacklog(true);
+      startHeartbeat();
+      ws.send(JSON.stringify({ name: username }));
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+
+        if (data.message) {
+          addMessage(data.name, data.message, "message", isProcessingBacklog);
+        } else if (data.joined) {
+          if (!isProcessingBacklog) addMessage(null, `${data.joined === username ? "You" : data.joined} joined the room`, "system");
+          setConnectedUsers((prev) => (prev.includes(data.joined) ? prev : [...prev, data.joined]));
+        } else if (data.quit) {
+          addMessage(null, `${data.quit === username ? "You" : data.quit} left the room`, "system");
+          setConnectedUsers((prev) => prev.filter((u) => u !== data.quit));
+        } else if (data.error) {
+          console.error("Server error:", data.error);
+          onError(data.error);
+        } else if (data.ready) {
+          setReadyToChat(true);
+          setIsProcessingBacklog(false);
+          setConnectedUsers((prev) => (prev.includes(username) ? prev : [...prev, username]));
+        }
+      } catch (err) {
+        console.error("Failed to parse WebSocket message:", err, e.data);
       }
     };
-  }, [roomname]); // Only depend on roomname, not username
 
-  // Heartbeat function to keep connection alive
-  const startHeartbeat = () => {
-    if (heartbeatIntervalRef.current) {
-      clearInterval(heartbeatIntervalRef.current);
-    }
-    
-    heartbeatIntervalRef.current = setInterval(() => {
-      if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
-        try {
-          // Send a ping message to keep connection alive
-          webSocketRef.current.send(JSON.stringify({ type: "ping" }));
-        } catch (err) {
-          console.error("Heartbeat ping failed:", err);
-          // Clear the interval if ping fails
-          if (heartbeatIntervalRef.current) {
-            clearInterval(heartbeatIntervalRef.current);
-            heartbeatIntervalRef.current = null;
+    ws.onclose = (event) => {
+      console.log(`🔌 WebSocket closed: code=${event.code}, reason=${event.reason}, wasClean=${event.wasClean}`);
+      stopHeartbeat();
+      setIsConnected(false);
+      setIsConnecting(false);
+      setReadyToChat(false);
+      setIsProcessingBacklog(false);
+      setConnectedUsers([]);
+
+      // Only auto-reconnect for unexpected disconnections
+      if (event.code !== 1000 && userIsInRoomRef.current) {
+        console.log("🔄 Attempting reconnect in 3s...");
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (userIsInRoomRef.current) {
+            console.log("🔄 Auto-reconnecting...");
+            setMessages([]);
+            setConnectedUsers([]);
+            // Don't call connectToRoom, just let useEffect re-run
           }
-        }
+        }, 3000);
       }
-    }, 30000); // Send ping every 30 seconds
-  };
+    };
 
-  const stopHeartbeat = () => {
-    if (heartbeatIntervalRef.current) {
-      clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-  };
+    ws.onerror = (e) => {
+      console.error("🚨 WebSocket error event:", e);
+      stopHeartbeat();
+      setIsConnected(false);
+      setIsConnecting(false);
+      setReadyToChat(false);
+      setIsProcessingBacklog(false);
+      setConnectedUsers([]);
+    };
 
-  useEffect(() => {
-    if (chatlogRef.current) {
-      chatlogRef.current.scrollTo({
-        top: chatlogRef.current.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages]);
+    // Cleanup
+    return () => {
+      userIsInRoomRef.current = false;
+      stopHeartbeat();
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, "Component unmounted or user left");
+      }
+      socketRef.current = null;
+    };
+  }, [roomname, roomKey]); // Reconnect when room changes or manual reconnect triggered
 
-  function containsProfaneSubstring(message) {
+  // ------------------- Utility functions -------------------
+  const containsProfaneSubstring = (message) => {
     const trimmedMessage = message.trim().toLowerCase();
     const words = trimmedMessage.split(/\s+/);
-
     for (const word of words) {
       for (let start = 0; start < word.length; start++) {
         for (let end = start + 1; end <= word.length; end++) {
-          const substring = word.slice(start, end);
-          if (leoProfanity.check(substring)) {
-            return true;
-          }
+          if (leoProfanity.check(word.slice(start, end))) return true;
         }
       }
     }
-
     return false;
-  }
-
-  const connectToRoom = async () => {
-    if (isConnecting || isConnected) {
-      // console.log(
-      //   "Already connecting or connected, skipping connection attempt"
-      // );
-      return;
-    }
-
-    // Handle private room IDs (64-char hex) vs public room names
-    const cleanedRoomname = roomname.match(/^[0-9a-f]{64}$/i)
-      ? roomname // Private room ID - keep as is
-      : roomname.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase(); // Public room - clean and lowercase
-
-    // console.log(`🏠 Room processing: "${roomname}" -> "${cleanedRoomname}"`);
-    // console.log(
-    //   `🔍 Is private room: ${roomname.match(/^[0-9a-f]{64}$/i) ? "Yes" : "No"}`
-    // );
-
-    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-    const host = import.meta.env.VITE_HOST_NAME || "127.0.0.1:8787";
-    const wsUrl = `${protocol}${host}/api/room/${cleanedRoomname}/websocket`;
-    // console.log(`🔗 Connecting to ${wsUrl}`);
-
-    setIsConnecting(true);
-    try {
-      await attemptConnection(wsUrl);
-      // console.log(`✅ Successfully connected to ${host}`);
-    } catch (error) {
-      console.error("Connection failed:", error);
-      onError(
-        `Unable to connect to chat server: ${
-          error?.message || "Unknown error"
-        }. Please check if Wrangler dev server is running.`
-      );
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const attemptConnection = (wsUrl) => {
-    return new Promise((resolve, reject) => {
-      if (
-        webSocketRef.current &&
-        webSocketRef.current.readyState !== WebSocket.CLOSED
-      ) {
-        webSocketRef.current.close();
-        webSocketRef.current = null;
-      }
-
-      console.log(`🔌 Creating WebSocket connection to: ${wsUrl}`);
-      const ws = new WebSocket(wsUrl);
-      webSocketRef.current = ws;
-
-      const connectionTimeout = setTimeout(() => {
-        if (ws.readyState === WebSocket.CONNECTING) {
-          ws.close();
-        }
-        reject(new Error("Connection timeout after 5 seconds"));
-      }, 5000);
-
-      ws.addEventListener("open", () => {
-        clearTimeout(connectionTimeout);
-        setIsConnected(true);
-        setReadyToChat(false); // Reset ready state
-        setIsProcessingBacklog(true); // Start processing backlog
-
-        // Start heartbeat to keep connection alive
-        startHeartbeat();
-
-        const initMessage = JSON.stringify({ name: username });
-        ws.send(initMessage);
-
-        resolve();
-      });
-
-      ws.addEventListener("message", (e) => {
-        try {
-          const data = JSON.parse(e.data);
-
-          if (data.message) {
-            // Add message with backlog indicator
-            addMessage(data.name, data.message, "message", isProcessingBacklog);
-          } else if (data.joined) {
-            // During backlog, this represents existing users
-            if (isProcessingBacklog) {
-              console.log(`👥 Existing user discovered: ${data.joined}`);
-            } else {
-              // Show personalized join message
-              const joinMessage =
-                data.joined === username
-                  ? "You joined the room"
-                  : `${data.joined} joined the room`;
-              addMessage(null, joinMessage, "system");
-              console.log(`👤 New user joined: ${data.joined}`);
-            }
-
-            // Add user to connected list (avoid duplicates)
-            setConnectedUsers((prev) => {
-              if (!prev.includes(data.joined)) {
-                return [...prev, data.joined];
-              }
-              return prev;
-            });
-          } else if (data.quit) {
-            // Show personalized quit message
-            const quitMessage =
-              data.quit === username
-                ? "You left the room"
-                : `${data.quit} left the room`;
-            addMessage(null, quitMessage, "system");
-            // Remove the user who quit
-            setConnectedUsers((prev) => {
-              const newList = prev.filter((user) => user !== data.quit);
-              console.log(`👋 User left: ${data.quit}, new list:`, newList);
-              return newList;
-            });
-          } else if (data.error) {
-            console.error("Server error:", data.error);
-            onError(data.error);
-          } else if (data.ready) {
-            setReadyToChat(true); // Now allow sending messages
-            setIsProcessingBacklog(false); // Stop backlog processing
-            // console.log(`✅ Ready to chat! Backlog processing complete.`);
-
-            // Add current user to connected users list when ready
-            setConnectedUsers((prev) => {
-              if (!prev.includes(username)) {
-                console.log(`✅ Current user ready: ${username}`);
-                return [...prev, username];
-              }
-              return prev;
-            });
-          }
-        } catch (err) {
-          console.error("Failed to parse message:", err, "Raw data:", e.data);
-        }
-      });
-
-      ws.addEventListener("close", (e) => {
-        console.log(
-          `🔌 WebSocket closed: code=${e.code}, reason="${e.reason}", wasClean=${e.wasClean}`
-        );
-        clearTimeout(connectionTimeout);
-        
-        // Stop heartbeat
-        stopHeartbeat();
-
-        setIsConnected(false);
-        setIsConnecting(false);
-        setReadyToChat(false);
-        setIsProcessingBacklog(false);
-        // Clear connected users when disconnected
-        setConnectedUsers([]);
-
-        // Handle different close codes
-        if (e.code === 1000 || e.code === 1001) {
-          // Normal closure - don't reconnect
-          console.log("✅ WebSocket closed normally");
-        } else if (e.code === 1006) {
-          // Abnormal closure - attempt reconnection after delay
-          console.log("🔄 WebSocket closed abnormally (1006), attempting to reconnect...");
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (!isConnected && !isConnecting) {
-              console.log("🔄 Attempting automatic reconnection...");
-              connectToRoom();
-            }
-          }, 3000); // Wait 3 seconds before reconnecting
-        } else {
-          // Other error codes
-          const errorMsg = `Connection closed unexpectedly (code: ${e.code}${
-            e.reason ? ", reason: " + e.reason : ""
-          })`;
-          console.error(errorMsg);
-          
-          // For production deployment issues, try to reconnect after a delay
-          if (e.code === 1011 || e.code === 1012 || e.code === 1013) {
-            console.log("🔄 Server error detected, attempting reconnection in 5 seconds...");
-            reconnectTimeoutRef.current = setTimeout(() => {
-              if (!isConnected && !isConnecting) {
-                connectToRoom();
-              }
-            }, 5000);
-          }
-          
-          reject(new Error(errorMsg));
-        }
-      });
-
-      ws.addEventListener("error", (e) => {
-        console.error("🚨 WebSocket error event:", e);
-        console.error("WebSocket state:", ws.readyState, "URL:", ws.url);
-        clearTimeout(connectionTimeout);
-
-        setIsConnected(false);
-        setIsConnecting(false);
-        setReadyToChat(false);
-        setIsProcessingBacklog(false);
-        // Clear connected users when there's an error
-        setConnectedUsers([]);
-        reject(new Error(`WebSocket error (readyState: ${ws.readyState})`));
-      });
-    });
   };
 
   const addMessage = (name, text, type = "message", isBacklog = false) => {
@@ -479,83 +168,75 @@ function ChatRoom({ username, roomname, onError, onDisconnect, displayName, room
       timestamp: new Date(),
       type,
       isOwn: name === username,
-      isBacklog, // Mark if this is a historical message
+      isBacklog,
     };
     setMessages((prev) => [...prev, newMessage]);
   };
 
   const sendMessage = () => {
     const trimmedMessage = currentMessage.trim();
-    if (webSocketRef.current && trimmedMessage && isConnected && readyToChat) {
-      if (trimmedMessage.length > 256) {
-        onError("Message too long (max 256 characters)");
-        return;
-      }
-
-      if (containsProfaneSubstring(trimmedMessage)) {
-        console.log("Message blocked for profanity");
-        onError("Please avoid using offensive language.");
-        setCurrentMessage("");
-        return;
-      }
-
-      console.log("Message allowed, sending...");
-      webSocketRef.current.send(JSON.stringify({ message: trimmedMessage }));
+    if (socketRef.current && trimmedMessage && isConnected && readyToChat) {
+      if (trimmedMessage.length > 256) return onError("Message too long (max 256 characters)");
+      if (containsProfaneSubstring(trimmedMessage)) return onError("Please avoid using offensive language.");
+      socketRef.current.send(JSON.stringify({ message: trimmedMessage }));
       setCurrentMessage("");
+      chatlogRef.current?.scrollTo({ top: chatlogRef.current.scrollHeight, behavior: "smooth" });
+    }
+  };
 
-      if (chatlogRef.current) {
-        chatlogRef.current.scrollTo({
-          top: chatlogRef.current.scrollHeight,
-          behavior: "smooth",
-        });
+  const handleKeyDown = (e) => { if (e.key === "Enter") { e.preventDefault(); sendMessage(); } };
+  const handleInputChange = (e) => setCurrentMessage(e.target.value);
+
+  const connectToRoom = () => {
+    if (!roomname) return;
+    
+    console.log("🔄 Manual reconnect triggered");
+    
+    // Close existing connection if any
+    if (socketRef.current) {
+      if (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING) {
+        socketRef.current.close(1000, "Manual reconnect");
       }
     }
-  };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
+    // Clear any pending reconnect timeouts
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
-  };
 
-  const handleInputChange = (e) => {
-    setCurrentMessage(e.target.value);
+    // Clear heartbeat
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+
+    // Reset state and trigger useEffect to create new connection
+    setIsConnecting(true);
+    setMessages([]);
+    setConnectedUsers([]);
+    userIsInRoomRef.current = true;
+    
+    // Force useEffect to re-run by updating a dependency
+    // The useEffect will handle the actual connection
+    setRoomKey(prev => prev + 1);
   };
 
   const shareRoom = async () => {
     try {
-      // Check if this is a private room (64-char hex)
       const isPrivateRoom = roomname.match(/^[0-9a-f]{64}$/i);
-
-      if (!isPrivateRoom) {
-        onError(
-          "Only private rooms can be shared. Public rooms can be joined by room name."
-        );
-        return;
-      }
-
+      if (!isPrivateRoom) return onError("Only private rooms can be shared.");
       const shareUrl = `${window.location.origin}/room/${roomname}`;
-
-      // Try to use the modern Clipboard API
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(shareUrl);
-      } else {
-        // Fallback for older browsers or non-secure contexts
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(shareUrl);
+      else {
         const textArea = document.createElement("textarea");
         textArea.value = shareUrl;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
         document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand("copy");
-        textArea.remove();
+        textArea.focus(); textArea.select();
+        document.execCommand("copy"); textArea.remove();
       }
-
       setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 3000); // Reset after 3 seconds
+      setTimeout(() => setLinkCopied(false), 3000);
     } catch (err) {
       console.error("Failed to copy link:", err);
       onError("Failed to copy room link to clipboard");

@@ -11,7 +11,7 @@ import { stackClientApp } from "./stackframe/stack.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AuthPage from "./pages/AuthPage.jsx";
 import QuestionnairePage from "./pages/QuestionnairePage.jsx";
-import NotFoundPage from "./pages/NotFoundErrorPage.jsx";
+import NotFoundErrorPage from "./pages/NotFoundErrorPage.jsx";
 
 function HandlerRoutes() {
   const location = useLocation();
@@ -54,7 +54,7 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="*" element={<NotFoundErrorPage />} />
             </Routes>
           </StackTheme>
         </StackProvider>
