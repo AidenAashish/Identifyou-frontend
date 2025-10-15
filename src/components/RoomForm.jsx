@@ -195,7 +195,7 @@ function RoomForm({
       // Step 1: Create room in Wrangler (Cloudflare Workers) to get unique roomId
       console.log("Creating room in Wrangler API...");
       const wranglerApiUrl = import.meta.env.VITE_HOST_NAME
-        ? `http://${import.meta.env.VITE_HOST_NAME}/api/room`
+        ? `https://${import.meta.env.VITE_HOST_NAME}/api/room`
         : "http://127.0.0.1:8787/api/room";
 
       const wranglerResponse = await fetch(wranglerApiUrl, {
