@@ -7,24 +7,27 @@ import axios from "axios";
 export default function QuestionnairePage() {
   const navigate = useNavigate();
   const user = useUser({ or: "return-null" });
-  const loading = user === undefined;
-  const [hasCreatedResponse, setHasCreatedResponse] = useState(false);
+  const loadingUser = user === undefined;
+
+  const [questionnaire, setQuestionnaire] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user === undefined) return; // wait until user is resolved
-    if (hasCreatedResponse) return; // prevent duplicate calls
+    if (user === undefined) return; // wait until user resolves
 
-    const createUserResponse = async () => {
+    if (!user) {
+      console.log("❌ No user found, redirecting to /auth");
+      navigate("/auth", { replace: true });
+      return;
+    }
+
+    const initQuestionnaire = async () => {
       try {
-        if (!user) {
-          console.log("❌ No user found, redirecting to /auth");
-          navigate("/auth", { replace: true });
-          return;
-        }
-        
-        console.log("🔄 Creating user response...");
-        const response = await axios.post(
+        console.log("🔄 Initializing questionnaire for user:", user.id);
+
+        // 1️⃣ Create or validate user response
+        await axios.post(
           `${import.meta.env.VITE_API_URL ?? "http://localhost:3000/api"}/questionnaire/responses/create`,
           {
             userId: user.id,
@@ -32,53 +35,52 @@ export default function QuestionnairePage() {
           }
         );
 
-        console.log("✅ User response created successfully");
-        setHasCreatedResponse(true); // Only set after successful response
+        // 2️⃣ Fetch questionnaire questions
+        const questionsRes = await axios.get(
+          `${import.meta.env.VITE_API_URL ?? "http://localhost:3000/api"}/questionnaire/questions/${user.id}`
+        );
 
-        if (response.status === 206) {
-          console.log(
-            "⚠️ Incomplete questionnaire response, user needs to complete it."
-          );
-        }
+        console.log("✅ Questionnaire fetched:", questionsRes.data);
+        setQuestionnaire(questionsRes.data);
       } catch (err) {
-        console.error("❌ Error creating user response:", err);
+        console.error("❌ Error initializing questionnaire:", err);
+
         if (
           err.response?.data?.error ===
             "Questionnaire already completed for this user" ||
           err.response?.status === 409
         ) {
-          console.log(
-            "⚠️ Questionnaire already completed, redirecting to /chat"
-          );
+          console.log("⚠️ Questionnaire already completed. Redirecting to /chat");
           navigate("/chat", { replace: true });
           return;
         }
-        
-        // Handle other errors - show error message to user
-        setError("Failed to initialize questionnaire. Please try refreshing the page.");
-        console.error("Failed to create questionnaire response");
+
+        setError("Failed to load questionnaire. Please try refreshing the page.");
+      } finally {
+        setLoading(false);
       }
     };
 
-    createUserResponse();
-  }, [user, hasCreatedResponse]);
+    initQuestionnaire();
+  }, [user, navigate]);
 
-  const handleQuestionnaireComplete = () => {
+  const handleComplete = () => {
     navigate("/chat", { replace: true });
   };
 
-  if (loading) {
+  // 🌀 Global loader while initializing
+  if (loadingUser || loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-white text-lg">Loading...</p>
+          <p className="text-white text-lg">Loading Questionnaire...</p>
         </div>
       </div>
     );
   }
 
-  // Show error if questionnaire initialization failed
+  // ⚠️ Error screen
   if (error) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -99,13 +101,12 @@ export default function QuestionnairePage() {
     );
   }
 
+  // ✅ Render questionnaire
   return (
-    <div>
-      <OnboardingQuestionnaire
-        user={user}
-        onComplete={handleQuestionnaireComplete}
-        hasCreatedResponse={hasCreatedResponse}
-      />
-    </div>
+    <OnboardingQuestionnaire
+      user={user}
+      questionnaire={questionnaire}
+      onComplete={handleComplete}
+    />
   );
 }
