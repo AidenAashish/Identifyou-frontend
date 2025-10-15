@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import Header from "../components/Header.jsx";
 import RoomForm from "../components/RoomForm.jsx";
 import ChatRoom from "../components/ChatRoom.jsx";
@@ -24,7 +24,9 @@ function ChatPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actualRoom, setActualRoom] = useState(null); // Store the actual room object
+  const [recommendedRooms, setRecommendedRooms] = useState([]);
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -180,8 +182,14 @@ function ChatPage() {
         `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/rooms/${currentUser.id}`
       );
 
+      if(response.data.recommendedRooms.length === 0) {
+        navigate("/questionnaire", { replace: true });
+        return;
+      }
+
       setPrivateRooms(response.data.privateRooms || []);
       setPublicRooms(response.data.publicRooms || []);
+      setRecommendedRooms(response.data.recommendedRooms || []);
     } catch (e) {
       console.error("Error fetching rooms:", e);
       // Set empty arrays on error
@@ -217,17 +225,23 @@ function ChatPage() {
     setRoomname(roomId);
     setEncryptedItem("roomname", roomId);
     
-    // If displayName is provided, use it; otherwise detect if it's a private room
-    if (displayName) {
-      setActualRoomName(displayName);
-      setEncryptedItem("actualRoomName", displayName);
+    // If room is an object with createdBy, use it directly (from sidebar click)
+    if (typeof room === 'object' && room?.createdBy) {
+      console.log("✨ Using room data from sidebar with createdBy:", room.createdBy);
+      setActualRoom(room);
+      setActualRoomName(displayName || room.name);
+      setEncryptedItem("actualRoomName", displayName || room.name);
     } else {
-      const isPrivateRoom = roomId && typeof roomId === 'string' && roomId.match(/^[0-9a-f]{64}$/i);
-      if (isPrivateRoom) {
-        await fetchRoomDetails(roomId);
-      } else {
-        setActualRoomName(roomId);
-        setEncryptedItem("actualRoomName", roomId);
+      // Otherwise fetch room details from API
+      console.log("🔍 Fetching room details from API...");
+      const roomDetails = await fetchRoomDetails(roomId);
+      
+      // console.log("📦 Room details after fetch:", roomDetails);
+      
+      // If displayName is provided and fetch failed, use it as fallback
+      if (displayName && !roomDetails) {
+        setActualRoomName(displayName);
+        setEncryptedItem("actualRoomName", displayName);
       }
     }
     
@@ -292,6 +306,7 @@ function ChatPage() {
           username={username}
           privateRooms={privateRooms}
           publicRooms={publicRooms}
+          recommendedRooms={recommendedRooms}
         />
       )}
 
@@ -303,6 +318,7 @@ function ChatPage() {
           onError={handleError}
           onDisconnect={resetToNameForm}
           roomType={actualRoom?.type}
+          room={actualRoom}
         />
       )}
     </div>

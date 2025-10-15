@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useUser } from "@stackframe/react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import leoProfanity from "leo-profanity";
 
 leoProfanity.add([
@@ -15,7 +18,7 @@ leoProfanity.add([
   "torture","beating","lynch","massacre","slaughter","exterminate","execute","kill them all","chop off"
 ]);
 
-function ChatRoom({ username, roomname, onError, onDisconnect, displayName, roomType }) {
+function ChatRoom({ username, roomname, onError, onDisconnect, displayName, roomType, room }) {
   const [messages, setMessages] = useState([]);
   const [currentMessage, setCurrentMessage] = useState("");
   const [isConnected, setIsConnected] = useState(false);
@@ -26,7 +29,11 @@ function ChatRoom({ username, roomname, onError, onDisconnect, displayName, room
   const [linkCopied, setLinkCopied] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [roomKey, setRoomKey] = useState(0); // Used to force reconnect
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
 
+  const user = useUser({ or: 'return-null' });
+  const navigate = useNavigate();
+  
   const chatlogRef = useRef(null);
   const heartbeatIntervalRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
@@ -240,6 +247,48 @@ function ChatRoom({ username, roomname, onError, onDisconnect, displayName, room
     } catch (err) {
       console.error("Failed to copy link:", err);
       onError("Failed to copy room link to clipboard");
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!user?.id) {
+      onError("You must be logged in to delete a room");
+      return;
+    }
+
+    const roomDisplayName = displayName || roomname;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${roomDisplayName}"?\n\nThis action cannot be undone and all messages will be lost.`
+    );
+    
+    if (!confirmDelete) return;
+
+    setIsDeletingRoom(true);
+    console.log("🗑️ Deleting room:", roomname);
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+      await axios.delete(`${apiUrl}/rooms`, {
+        data: {
+          userId: user.id,
+          roomId: roomname,
+        },
+      });
+
+      console.log("✅ Room deleted successfully");
+      
+      // Close WebSocket connection gracefully
+      if (socketRef.current) {
+        socketRef.current.close(1000, "Room deleted");
+      }
+      
+      onDisconnect();
+    } catch (error) {
+      console.error("❌ Failed to delete room:", error);
+      const errorMessage = error.response?.data?.error || "Failed to delete room. Please try again.";
+      onError(errorMessage);
+    } finally {
+      setIsDeletingRoom(false);
     }
   };
 
@@ -713,6 +762,58 @@ function ChatRoom({ username, roomname, onError, onDisconnect, displayName, room
                 <span>Leave Room</span>
               </div>
             </button>
+
+            {user?.id && room?.createdBy && user.id === room.createdBy && (
+            <button
+              onClick={handleDeleteRoom}
+              disabled={isDeletingRoom}
+              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed text-white font-semibold py-2 px-3 sm:px-4 rounded-xl transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-400/30 text-xs sm:text-sm"
+            >
+              <div className="flex items-center justify-center space-x-2">
+                {isDeletingRoom ? (
+                  <>
+                    <svg
+                      className="animate-spin w-3 sm:w-4 h-3 sm:h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-3 sm:w-4 h-3 sm:h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                    <span>Delete Room</span>
+                  </>
+                )}
+              </div>
+            </button>
+            )}
           </div>
         </div>
       </div>

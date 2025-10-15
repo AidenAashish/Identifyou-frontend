@@ -2,155 +2,124 @@ import { useEffect, useState } from "react";
 import { ChevronRight, CheckCircle } from "lucide-react";
 import { getEncryptedJSON, setEncryptedItem } from "../utils/encryption.js";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-export default function OnboardingQuestionnaire({ user, onComplete }) {
+export default function OnboardingQuestionnaire({ user, onComplete, hasCreatedResponse }) {
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
-  const [answers, setAnswers] = useState({
-    age: "",
-    gender: "",
-    mainConcern: "",
-    supportType: "",
-    experience: "",
-    goals: []
-  });
+  const [answers, setAnswers] = useState({}); // Store answers by question ID
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const questions = [
-    {
-      id: 1,
-      title: "Let's get to know you better",
-      subtitle: "This helps us provide better support",
-      fields: [
-        {
-          name: "age",
-          label: "What's your age range?",
-          type: "select",
-          options: [
-            { value: "13-17", label: "13-17 years" },
-            { value: "18-24", label: "18-24 years" },
-            { value: "25-34", label: "25-34 years" },
-          ]
-        },
-        {
-          name: "gender",
-          label: "How do you identify?",
-          type: "select",
-          options: [
-            { value: "male", label: "Male" },
-            { value: "female", label: "Female" },
-            { value: "non-binary", label: "Non-binary" },
-            { value: "prefer-not-to-say", label: "Prefer not to say" },
-            { value: "other", label: "Other" }
-          ]
-        }
-      ]
-    },
-    {
-      id: 2,
-      title: "What brings you here?",
-      subtitle: "Understanding your needs helps us support you better",
-      fields: [
-        {
-          name: "mainConcern",
-          label: "What's your main area of concern?",
-          type: "select",
-          options: [
-            { value: "bullying", label: "Bullying & Harassment" },
-            { value: "domestic-issues", label: "Domestic Issues" },
-            { value: "identity-crisis", label: "Identity Crisis" },
-            { value: "mental-health", label: "Mental Health" },
-            { value: "academic-stress", label: "Academic Stress" },
-            { value: "other", label: "Other" }
-          ]
-        },
-        {
-          name: "supportType",
-          label: "What type of support are you looking for?",
-          type: "select",
-          options: [
-            { value: "peer-support", label: "Peer Support & Community" },
-            { value: "professional-guidance", label: "Professional Guidance" },
-            { value: "anonymous-chat", label: "Anonymous Chat" },
-            { value: "resource-sharing", label: "Resource Sharing" },
-            { value: "just-listening", label: "Someone to Listen" }
-          ]
-        }
-      ]
-    },
-    {
-      id: 3,
-      title: "Your goals with IdentifYou",
-      subtitle: "Help us personalize your experience",
-      fields: [
-        {
-          name: "experience",
-          label: "Have you used similar platforms before?",
-          type: "select",
-          options: [
-            { value: "first-time", label: "This is my first time" },
-            { value: "some-experience", label: "I have some experience" },
-            { value: "experienced", label: "I'm experienced with these platforms" }
-          ]
-        },
-        {
-          name: "goals",
-          label: "What do you hope to achieve? (Select all that apply)",
-          type: "multi-select",
-          options: [
-            { value: "find-community", label: "Find a supportive community" },
-            { value: "get-advice", label: "Get advice and guidance" },
-            { value: "share-experience", label: "Share my experiences" },
-            { value: "help-others", label: "Help others facing similar issues" },
-            { value: "learn-coping", label: "Learn coping strategies" },
-            { value: "build-confidence", label: "Build confidence and self-esteem" }
-          ]
-        }
-      ]
-    }
-  ];
-
-  const currentQuestion = questions.find(q => q.id === currentStep);
-  const totalSteps = questions.length;
+  const [questionnaire, setQuestionnaire] = useState([]);
 
   useEffect(() => {
-    const ExistingRecommendedRooms = getEncryptedJSON('recommendedRooms');
-    if(ExistingRecommendedRooms && ExistingRecommendedRooms.length > 0) {
-      console.log("✅ Recommended rooms already exist:", ExistingRecommendedRooms);
-      navigate('/chat');
+    if (!hasCreatedResponse) return; // Wait until response is created
+    if(!user || !user.id) {
+      console.error("User ID is missing. Cannot fetch questionnaire.");
       return;
     }
-  }, []);
+    console.log("Fetching questionnaire for user ID:", user.id);
+    const fetchQuestionnaire = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/questionnaire/questions/${user.id}`);
+        setQuestionnaire(response.data);
+        console.log("✅ Questionnaire fetched successfully:", response.data);
+      } catch (error) {
+        console.error("Error fetching questionnaire:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQuestionnaire();
+  }, [hasCreatedResponse, user]);
 
-  const handleInputChange = (fieldName, value) => {
-    if (fieldName === "goals") {
+  const currentQuestion = questionnaire[currentStep - 1]; // Use array index (0-based)
+  const totalSteps = questionnaire.length;
+
+  // useEffect(() => {
+  //   const ExistingRecommendedRooms = getEncryptedJSON("recommendedRooms");
+  //   if (ExistingRecommendedRooms && ExistingRecommendedRooms.length > 0) {
+  //     console.log(
+  //       "✅ Recommended rooms already exist:",
+  //       ExistingRecommendedRooms
+  //     );
+  //     navigate("/chat");
+  //     return;
+  //   }
+  // }, []);
+
+  const handleInputChange = (questionId, optionId, isMultiSelect) => {
+    if (isMultiSelect) {
       // Handle multi-select
-      const currentGoals = answers.goals || [];
-      const newGoals = currentGoals.includes(value)
-        ? currentGoals.filter(goal => goal !== value)
-        : [...currentGoals, value];
-      setAnswers(prev => ({ ...prev, goals: newGoals }));
+      const currentValues = answers[questionId] || [];
+      const newValues = currentValues.includes(optionId)
+        ? currentValues.filter((val) => val !== optionId)
+        : [...currentValues, optionId];
+      setAnswers((prev) => ({ ...prev, [questionId]: newValues }));
     } else {
-      setAnswers(prev => ({ ...prev, [fieldName]: value }));
+      // Handle single select - store single option ID
+      setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
     }
   };
 
   const canProceed = () => {
-    const currentFields = currentQuestion.fields;
-    return currentFields.every(field => {
-      if (field.type === "multi-select") {
-        return answers[field.name] && answers[field.name].length > 0;
-      }
-      return answers[field.name] && answers[field.name].trim() !== "";
-    });
+    if (!currentQuestion) return false;
+    
+    // Check if current question is answered
+    const questionKey = currentQuestion.id;
+    const answer = answers[questionKey];
+    
+    if (currentQuestion.type.toUpperCase() === "MULTI_SELECT") {
+      // For multi-select, check if at least one option is selected
+      return answer && Array.isArray(answer) && answer.length > 0;
+    }
+    // For SELECT type, check if an option ID is selected
+    return answer !== undefined && answer !== null && answer !== "";
   };
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleSubmit();
+  const handleNext = async () => {
+    if (!currentQuestion) return;
+    
+    const questionId = currentQuestion.id;
+    const selectedOption = answers[questionId];
+    
+    // For multi-select, ensure it's an array; for single-select, keep as single value
+    const isMultiSelect = currentQuestion.type.toUpperCase() === "MULTI_SELECT";
+    const optionToSend = isMultiSelect 
+      ? (Array.isArray(selectedOption) ? selectedOption : [selectedOption])
+      : selectedOption;
+    
+    console.log("📝 Submitting answer:", { 
+      questionId, 
+      authId: user.id, 
+      selectedOption: optionToSend,
+      isMultiSelect,
+      type: currentQuestion.type 
+    });
+    
+    try {
+      // Submit the current answer to backend
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/questionnaire/responses`,
+        { 
+          questionId, 
+          authId: user.id, 
+          selectedOption: optionToSend
+        }
+      );
+      console.log("✅ Response saved:", response.data);
+      
+      // Move to next step or submit
+      if (currentStep < totalSteps) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        // Last question answered, generate recommendations
+        handleSubmit();
+      }
+    } catch (error) {
+      console.error("❌ Error submitting response:", error);
+      setError("Failed to save your answer. Please try again.");
     }
   };
 
@@ -160,108 +129,61 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
     }
   };
 
-  const getRecommendedRooms = () => {
-    const rooms = [];
-    
-    // Based on main concern
-    if (answers.mainConcern === "bullying") {
-      rooms.push("Anti Bullying");
-    }
-    if (answers.mainConcern === "domestic-issues") {
-      rooms.push("Domestic Issues");
-    }
-    if (answers.mainConcern === "identity-crisis") {
-      rooms.push("Get Identified");
-    }
-    if (answers.mainConcern === "academic-stress") {
-      rooms.push("Study Group");
-    }
-    if (answers.mainConcern === "mental-health") {
-      rooms.push("Mental Health Support");
-    }
-    if (answers.mainConcern === "relationships") {
-      rooms.push("Relationship Advice");
-    }
-    
-    // Always include introductions for newcomers
-    if (!rooms.includes("Introductions")) {
-      rooms.push("Introductions");
-    }
-    
-    // Add rooms based on support type
-    if (answers.supportType === "peer-support") {
-      if (!rooms.includes("General Support")) {
-        rooms.push("General Support");
-      }
-    }
-    if (answers.supportType === "professional-guidance") {
-      if (!rooms.includes("Professional Help")) {
-        rooms.push("Professional Help");
-      }
-    }
-    if (answers.supportType === "anonymous-chat") {
-      if (!rooms.includes("Anonymous Chat")) {
-        rooms.push("Anonymous Chat");
-      }
-    }
-    if (answers.supportType === "resource-sharing") {
-      if (!rooms.includes("Resource Sharing")) {
-        rooms.push("Resource Sharing");
-      }
-    }
-    
-    // Add rooms based on goals
-    if (answers.goals && answers.goals.includes("find-community")) {
-      if (!rooms.includes("General Support")) {
-        rooms.push("General Support");
-      }
-    }
-    if (answers.goals && answers.goals.includes("help-others")) {
-      if (!rooms.includes("Volunteer Hub")) {
-        rooms.push("Volunteer Hub");
-      }
-    }
-    if (answers.goals && answers.goals.includes("learn-coping")) {
-      if (!rooms.includes("Coping Strategies")) {
-        rooms.push("Coping Strategies");
-      }
-    }
-    if (answers.goals && answers.goals.includes("build-confidence")) {
-      if (!rooms.includes("Confidence Building")) {
-        rooms.push("Confidence Building");
-      }
-    }
-    
-    // Ensure we have at least some default rooms
-    return rooms.length > 0 ? rooms : ["Introductions", "General Support"];
-  };
-
   const handleSubmit = async () => {
     setLoading(true);
     setError("");
 
     try {
-      // Generate personalized room recommendations
-      const recommendedRooms = getRecommendedRooms();
 
-      // Save questionnaire data to localStorage (Stack doesn't have user metadata like Supabase)
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/questionnaire/recommendations`,
+        { authId: user.id }
+      );
+
+      console.log("✅ Room recommendations generated:", response.data);
+
+      const recommendedRoomNames = response.data.recommendedRooms.map(
+        (room) => room.name
+      );
+      setEncryptedItem("recommendedRooms", recommendedRoomNames);
       setEncryptedItem("onboarding_completed", "true");
-      // setEncryptedItem("questionnaire_data", JSON.stringify(answers));
-      // setEncryptedItem("questionnaire_completed_at", new Date().toISOString());
-
-      // Store recommended rooms and answers in encrypted localStorage
-      setEncryptedItem('recommendedRooms', recommendedRooms);
-      // setEncryptedItem('questionnaireAnswers', answers);
-      setEncryptedItem('onboarding_completed', 'true');
 
       onComplete();
     } catch (err) {
-      console.error("Error saving questionnaire:", err);
-      setError("Failed to save your responses. Please try again.");
+      if (
+        err.response?.status === 400 &&
+        err.response?.data?.error === "Questionnaire incomplete"
+      ) {
+        // User hasn't answered all questions
+        const { answeredQuestions, totalQuestions, remainingQuestions } =
+          err.response.data;
+        setError(
+          `Please answer all questions. You've answered ${answeredQuestions} out of ${totalQuestions} questions. ${remainingQuestions} remaining.`
+        );
+      } else if (err.response?.status === 404) {
+        setError(
+          "No questionnaire responses found. Please complete the questionnaire first."
+        );
+      } else if (err.response?.status === 400) {
+        setError("Invalid user ID. Please try signing in again.");
+      } else {
+        setError("Failed to generate room recommendations. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen z-40 bg-gradient-to-br from-gray-900 via-blue-900/80 to-gray-900 backdrop-blur-sm bg-black/60 animate-fadeIn">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-2 border-purple-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+          <p className="text-white font-semibold">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white overflow-hidden relative">
@@ -288,11 +210,15 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
       {/* Progress bar */}
       <div className="relative z-10 max-w-2xl mx-auto px-4 mb-8">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-gray-400">Step {currentStep} of {totalSteps}</span>
-          <span className="text-sm text-gray-400">{Math.round((currentStep / totalSteps) * 100)}% Complete</span>
+          <span className="text-sm text-gray-400">
+            Step {currentStep} of {totalSteps}
+          </span>
+          <span className="text-sm text-gray-400">
+            {Math.round((currentStep / totalSteps) * 100)}% Complete
+          </span>
         </div>
         <div className="w-full bg-gray-700 rounded-full h-2">
-          <div 
+          <div
             className="bg-gradient-to-r from-purple-600 to-purple-400 h-2 rounded-full transition-all duration-300"
             style={{ width: `${(currentStep / totalSteps) * 100}%` }}
           ></div>
@@ -304,34 +230,34 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
         <div className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-8 border border-purple-500/20 shadow-2xl">
           {/* Question header */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-white mb-2">{currentQuestion.title}</h2>
-            <p className="text-gray-300">{currentQuestion.subtitle}</p>
+            {/* <h2 className="text-3xl font-bold text-white mb-2">
+              {currentQuestion.title || "Title"}
+            </h2> */}
+            <p className="text-gray-300">{currentQuestion?.questionText || "Question text not available"}</p>
           </div>
 
-          {/* Question fields */}
+          {/* Question options */}
           <div className="space-y-6">
-            {currentQuestion.fields.map((field) => (
-              <div key={field.name} className="space-y-3">
-                <label className="block text-lg font-medium text-white mb-3">
-                  {field.label}
-                </label>
-                
-                {field.type === "select" && (
+            {currentQuestion && (
+              <div className="space-y-3">
+                {currentQuestion.type.toUpperCase() === "SELECT" && (
                   <div className="space-y-2">
-                    {field.options.map((option) => (
+                    {currentQuestion.options.map((option) => (
                       <button
-                        key={option.value}
+                        key={option.id}
                         type="button"
-                        onClick={() => handleInputChange(field.name, option.value)}
+                        onClick={() =>
+                          handleInputChange(currentQuestion.id, option.id, false)
+                        }
                         className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 ${
-                          answers[field.name] === option.value
+                          answers[currentQuestion.id] === option.id
                             ? "border-purple-500 bg-purple-500/20 text-white"
                             : "border-gray-600 bg-gray-700/30 text-gray-300 hover:border-purple-400 hover:bg-gray-700/50"
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span>{option.label}</span>
-                          {answers[field.name] === option.value && (
+                          <span>{option.optionLabel}</span>
+                          {answers[currentQuestion.id] === option.id && (
                             <CheckCircle className="h-5 w-5 text-purple-400" />
                           )}
                         </div>
@@ -340,22 +266,24 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
                   </div>
                 )}
 
-                {field.type === "multi-select" && (
+                {currentQuestion.type.toUpperCase() === "MULTI_SELECT" && (
                   <div className="space-y-2">
-                    {field.options.map((option) => (
+                    {currentQuestion.options.map((option) => (
                       <button
-                        key={option.value}
+                        key={option.id}
                         type="button"
-                        onClick={() => handleInputChange(field.name, option.value)}
+                        onClick={() =>
+                          handleInputChange(currentQuestion.id, option.id, true)
+                        }
                         className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-300 ${
-                          answers[field.name]?.includes(option.value)
+                          answers[currentQuestion.id]?.includes(option.id)
                             ? "border-purple-500 bg-purple-500/20 text-white"
                             : "border-gray-600 bg-gray-700/30 text-gray-300 hover:border-purple-400 hover:bg-gray-700/50"
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span>{option.label}</span>
-                          {answers[field.name]?.includes(option.value) && (
+                          <span>{option.optionLabel}</span>
+                          {answers[currentQuestion.id]?.includes(option.id) && (
                             <CheckCircle className="h-5 w-5 text-purple-400" />
                           )}
                         </div>
@@ -364,7 +292,7 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
                   </div>
                 )}
               </div>
-            ))}
+            )}
           </div>
 
           {/* Error message */}
@@ -385,7 +313,7 @@ export default function OnboardingQuestionnaire({ user, onComplete }) {
             </button>
 
             <button
-              onClick={handleNext}
+              onClick={() => handleNext(currentQuestion.id, user.id, answers[currentQuestion.id])}
               disabled={!canProceed() || loading}
               className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-xl transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none shadow-lg hover:shadow-purple-500/30"
             >

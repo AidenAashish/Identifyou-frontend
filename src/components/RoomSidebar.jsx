@@ -8,9 +8,9 @@ import {
   getEncryptedJSON,
 } from "../utils/encryption.js";
 
-function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publicRooms }) {
+function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publicRooms, recommendedRooms = [] }) {
   const [isOpen, setIsOpen] = useState(true);
-  const [recommendedRooms, setRecommendedRooms] = useState([]);
+  // const [recommendedRooms, setRecommendedRooms] = useState([]);
   const user = useUser({ or: 'return-null' });
   const navigate = useNavigate();
 
@@ -27,15 +27,15 @@ function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publi
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    const fetchRecommendedRooms = () => {
-      const rooms = getEncryptedJSON('recommendedRooms', []);
-      setRecommendedRooms(rooms);
-      // console.log("Recommended Rooms:", rooms);
-    }
+  // useEffect(() => {
+  //   const fetchRecommendedRooms = () => {
+  //     const rooms = getEncryptedJSON('recommendedRooms', []);
+  //     setRecommendedRooms(rooms);
+  //     // console.log("Recommended Rooms:", rooms);
+  //   }
 
-    fetchRecommendedRooms();
-  }, []);
+  //   fetchRecommendedRooms();
+  // }, []);
 
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
@@ -55,8 +55,12 @@ function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publi
           <div className="space-y-2">
             {Array.isArray(recommendedRooms) && recommendedRooms.length > 0 && recommendedRooms.map((room) => (
               <button
-                key={room}
-                onClick={() => onRoomClick && onRoomClick({ roomId: room, name: room, type: 'public' })}
+                key={room.id || room.name || room}
+                onClick={() => onRoomClick && onRoomClick({ 
+                  roomId: room.roomId || room.name || room, 
+                  name: room.name || room, 
+                  type: 'public' 
+                })}
                 className="w-full flex items-center space-x-3 p-3 rounded-xl bg-gray-800/30 hover:bg-purple-600/20 transition-all duration-200 group border border-transparent hover:border-purple-500/30 cursor-pointer"
               >
                 <div className="flex-shrink-0">
@@ -64,7 +68,7 @@ function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publi
                 </div>
                 <div className="flex-1 text-left">
                   <p className="text-white font-medium text-sm group-hover:text-purple-300 transition-colors duration-200">
-                    {room}
+                    {typeof room === 'string' ? room : room.name}
                   </p>
                   <p className="text-gray-400 text-xs">
                     Public • Recommended
@@ -89,7 +93,12 @@ function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publi
             {publicRooms.map((room) => (
               <button
                 key={room.id}
-                onClick={() => onRoomClick && onRoomClick({ roomId: room.roomId || room.name, name: room.name, type: 'public' })}
+                onClick={() => onRoomClick && onRoomClick({ 
+                  roomId: room.roomId || room.name, 
+                  name: room.name, 
+                  type: 'public',
+                  createdBy: room.createdBy 
+                })}
                 className="w-full flex items-center space-x-3 p-3 rounded-xl bg-gray-800/30 hover:bg-green-600/20 transition-all duration-200 group border border-transparent hover:border-green-500/30 cursor-pointer"
               >
                 <div className="flex-shrink-0">
@@ -122,7 +131,12 @@ function RoomSidebar({ isMobile = false, onRoomClick = null, privateRooms, publi
             {privateRooms.map((room) => (
               <button
                 key={room.id}
-                onClick={() => onRoomClick && onRoomClick({ roomId: room.roomId, name: room.name, type: 'private' })}
+                onClick={() => onRoomClick && onRoomClick({ 
+                  roomId: room.roomId, 
+                  name: room.name, 
+                  type: 'private',
+                  createdBy: room.createdBy 
+                })}
                 className="w-full flex items-center space-x-3 p-3 rounded-xl bg-gray-800/30 hover:bg-blue-600/20 transition-all duration-200 group border border-transparent hover:border-blue-500/30 cursor-pointer"
               >
                 <div className="flex-shrink-0">

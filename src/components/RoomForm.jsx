@@ -13,6 +13,7 @@ function RoomForm({
   username,
   privateRooms,
   publicRooms,
+  recommendedRooms,
 }) {
   const navigate = useNavigate();
   const [roomName, setRoomName] = useState("");
@@ -23,12 +24,10 @@ function RoomForm({
   const [newRoomName, setNewRoomName] = useState("");
   const [roomType, setRoomType] = useState("public");
   const [isCreating, setIsCreating] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const user = useUser({ or: "return-null" });
   const [rooms, setRooms] = useState([]);
-  const [filteredRooms, setFilteredRooms] = useState([
-    ...publicRooms,
-    ...privateRooms,
-  ]);
+  const [filteredRooms, setFilteredRooms] = useState([]);
 
   // Handle room click from sidebar
   const handleRoomClick = (roomData) => {
@@ -44,14 +43,44 @@ function RoomForm({
         "displayName:",
         displayName,
         "isPrivate:",
-        isPrivate
+        isPrivate,
+        "createdBy:",
+        roomData.createdBy
       );
-      onJoinRoom(roomId, displayName);
+      // Pass the entire roomData object so createdBy is included
+      onJoinRoom(roomData, displayName);
     }
   };
 
+  // Initialize component once props are available
   useEffect(() => {
-    const recommendedRooms = getEncryptedJSON("recommendedRooms", []);
+    setIsInitializing(false);
+    // Initialize filteredRooms once when props are available
+    const combined = [
+      ...publicRooms,
+      ...privateRooms, 
+      ...recommendedRooms
+    ];
+    setFilteredRooms(combined);
+  }, [publicRooms, privateRooms, recommendedRooms]);
+
+  useEffect(() => {
+    if(!user?.id) {
+      return; // Don't fetch if no user ID
+    }
+    const fetchRooms = async () => {
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL || "http://localhost:3000/api"}/rooms/${user.id}`);
+        setRooms(response.data);
+      } catch (error) {
+        console.error("Error fetching rooms:", error);
+      }
+    };
+    fetchRooms();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const recommendedRooms = Array.isArray(rooms.recommendedRooms) ? rooms.recommendedRooms : [];
 
     if (recommendedRooms.length > 0) {
       setRooms(
@@ -61,33 +90,46 @@ function RoomForm({
           isRecommended: true,
         }))
       );
-    } else {
-      navigate("/questionnaire", { replace: true });
-    }
-  }, [navigate]);
+    } 
+    // else {
+    //   navigate("/questionnaire", { replace: true });
+    // }
+  }, [rooms, navigate]);
 
   useEffect(() => {
-    const recommendedRooms = getEncryptedJSON("recommendedRooms", []).map(
-      (name) => ({
-        name,
-        isRecommended: true,
-      })
-    );
+    // Only update filtered rooms when search term changes
+    if (roomName.trim() === "") {
+      // Reset to all rooms when search is empty
+      const combined = [
+        ...publicRooms,
+        ...privateRooms,
+        ...recommendedRooms.map(room => 
+          typeof room === 'string' ? { name: room, isRecommended: true } : { ...room, isRecommended: true }
+        )
+      ];
+      setFilteredRooms(combined);
+    } else {
+      // Filter based on search term
+      const recommendedRoomsList = getEncryptedJSON("recommendedRooms", []).map(
+        (name) => ({
+          name,
+          isRecommended: true,
+        })
+      );
 
-    const combined = [
-      ...recommendedRooms,
-      ...publicRooms.map((r) => ({ ...r, isRecommended: false })),
-      ...privateRooms.map((r) => ({ ...r, isRecommended: false })),
-    ];
+      const combined = [
+        ...recommendedRoomsList,
+        ...publicRooms.map((r) => ({ ...r, isRecommended: false })),
+        ...privateRooms.map((r) => ({ ...r, isRecommended: false })),
+      ];
 
-    const filtered = combined.filter((room) =>
-      room.name.toLowerCase().includes(roomName.toLowerCase())
-    );
+      const filtered = combined.filter((room) =>
+        room.name?.toLowerCase().includes(roomName.toLowerCase())
+      );
 
-    // console.log("Filtered Rooms:", filtered);
-
-    setFilteredRooms(filtered);
-  }, [roomName, publicRooms, privateRooms]);
+      setFilteredRooms(filtered);
+    }
+  }, [roomName, publicRooms, privateRooms, recommendedRooms]);
 
   const handleJoinPublic = () => {
     const trimmedRoom = roomName.trim();
@@ -153,7 +195,7 @@ function RoomForm({
       // Step 1: Create room in Wrangler (Cloudflare Workers) to get unique roomId
       console.log("Creating room in Wrangler API...");
       const wranglerApiUrl = import.meta.env.VITE_HOST_NAME
-        ? `https://${import.meta.env.VITE_HOST_NAME}/api/room`
+        ? `http://${import.meta.env.VITE_HOST_NAME}/api/room`
         : "http://127.0.0.1:8787/api/room";
 
       const wranglerResponse = await fetch(wranglerApiUrl, {
@@ -232,6 +274,18 @@ function RoomForm({
     setIsCreating(false);
   };
 
+  // Show loading state while initializing
+  if (isInitializing) {
+    return (
+      <div className="fixed items-center justify-center inset-0 z-40 bg-gradient-to-br from-gray-900 via-blue-900/80 to-gray-900 backdrop-blur-sm flex flex-col justify-center items-center animate-fadeIn p-4">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-8 h-8 border-2 border-purple-400/30 border-t-blue-400 rounded-full animate-spin"></div>
+          <p className="text-white font-semibold">Loading rooms...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* FormSidebar Component */}
@@ -240,6 +294,7 @@ function RoomForm({
         <RoomSidebar
           privateRooms={privateRooms}
           publicRooms={publicRooms}
+          recommendedRooms={recommendedRooms}
           onRoomClick={handleRoomClick}
         />
         <FormSidebar privateRooms={privateRooms} publicRooms={publicRooms} />
